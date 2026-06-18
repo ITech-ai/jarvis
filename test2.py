@@ -2,7 +2,7 @@ import threading
 import time
 import webview
 
-
+# وارد کردن توابع اختصاصی خودت
 from features.G_S_i import get_SI
 from features.Global_price import get_price
 from features.site_control import run_command
@@ -11,7 +11,6 @@ from features.translator import transletor
 from listening import listen
 from speak import speak as original_speak
 
-
 jarvis_window = None
 
 
@@ -19,7 +18,7 @@ def ui_add_message(text, sender):
 
     global jarvis_window
     if jarvis_window:
-    
+        
         safe_text = text.replace("'", "\\'").replace("\n", " ")
         jarvis_window.evaluate_js(f"addUserMessage('{safe_text}', '{sender}');")
 
@@ -29,9 +28,7 @@ def speak(text):
     global jarvis_window
     if jarvis_window:
         jarvis_window.evaluate_js("setSpeakingState(true);")
-        ui_add_message(text, 'jarvis') 
-
-   
+        ui_add_message(text, 'jarvis')
     original_speak(text)
 
     if jarvis_window:
@@ -41,7 +38,6 @@ def speak(text):
 def jarvis_core_logic():
     global jarvis_window
 
-
     time.sleep(3)
     speak("hi sir")
 
@@ -49,7 +45,6 @@ def jarvis_core_logic():
         order = listen()
         if order is not None:
             print(order)
- 
             ui_add_message(order, 'user')
             
             # _________________________say_hi________________________
@@ -97,6 +92,7 @@ def jarvis_core_logic():
 if __name__ == "__main__":
     jarvis_window = webview.create_window(
         title="JARVIS AI Core",
+        url="UI/UI_v2/ui2.html",  
         width=1500,
         height=900,
         resizable=True,
@@ -105,5 +101,5 @@ if __name__ == "__main__":
 
     threading.Thread(target=jarvis_core_logic, daemon=True).start()
 
-
+    # ۳. راه‌اندازی پنجره وب‌ویو
     webview.start()
