@@ -25,9 +25,6 @@
             transition: opacity 0.5s ease, transform 0.5s ease;
         }
 
-        /* ========================================================
-           ✨ بخش منوی بالای مانیتور (HUD Top Menu Overlay)
-           ======================================================== */
         .hud-header {
             position: absolute;
             top: 3%; 
@@ -84,9 +81,6 @@
             pointer-events: none;
         }
 
-        /* ========================================================
-           💬 استایل اختصاصی بخش چت (Glassmorphism HUD)
-           ======================================================== */
         .chat-overlay {
             position: absolute;
             top: 55%;
@@ -225,7 +219,6 @@
         const webglContainer = document.getElementById('webgl-container');
         const chatBox = document.getElementById('chatBox');
 
-        // سوییچ کردن تب‌ها
         function selectTab(element, tabName) {
             document.querySelectorAll('.hud-item').forEach(item => item.classList.remove('active'));
             element.classList.add('active');
@@ -241,7 +234,6 @@
             }
         }
 
-        // 🚀 متصل کردن قطعی به شیء window جهت دسترسی بدون خطای پایتون
         window.addUserMessage = function(text, sender) {
             const msgDiv = document.createElement('div');
             msgDiv.classList.add('message', sender);
@@ -251,7 +243,6 @@
                 chatBox.appendChild(msgDiv);
                 chatBox.scrollTop = chatBox.scrollHeight;
             } else {
-                // افکت تایپ هکری برای پاسخ‌های صوتی JARVIS
                 chatBox.appendChild(msgDiv);
                 let i = 0;
                 const cursor = document.createElement('span');
@@ -272,15 +263,12 @@
             }
         };
 
-        // متغیر سراسری وضعیت صحبت کردن برای انیمیشن هسته
         let isSpeaking = false; 
         window.setSpeakingState = function(state) { 
             isSpeaking = state; 
         };
 
-        // ==========================================
-        // 🎨 موتور گرافیکی سه بعدی Three.js طلایی
-        // ==========================================
+
         const JARVIS_THEME = {
             wireframeColor: 0xd4af37,    
             vertexColor: 0xffe89e,       
