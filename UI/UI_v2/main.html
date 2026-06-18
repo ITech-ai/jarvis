@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS Mainframe Operating System</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #020201; 
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+            color: #fffae0;
+        }
+
+        .hud-header {
+            position: absolute;
+            top: 3%; 
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            gap: 25px;
+            align-items: center;
+            pointer-events: auto;
+        }
+
+        .hud-item {
+            color: rgba(250, 223, 57, 0.4); 
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            cursor: pointer;
+            padding: 5px 12px;
+            transition: all 0.4s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            user-select: none;
+        }
+
+        .hud-item::before {
+            content: '■';
+            font-size: 8px;
+            color: transparent;
+            transition: all 0.4s ease;
+        }
+
+        .hud-item:hover, .hud-item.active {
+            color: #fadf39; 
+            text-shadow: 0 0 10px rgba(250, 223, 57, 0.8), 0 0 20px rgba(250, 223, 57, 0.4);
+        }
+
+        .hud-item:hover::before, .hud-item.active::before {
+            color: #fadf39;
+            text-shadow: 0 0 8px #fadf39;
+        }
+
+        .hud-line {
+            position: absolute;
+            top: calc(3% + 35px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: 320px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(250, 223, 57, 0.3), rgba(250, 223, 57, 0.3), transparent);
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .view-frame {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            z-index: 1;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .view-frame.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #core-frame { z-index: 2; }
+        #chat-frame, #dashboard-frame { z-index: 5; }
+    </style>
+</head>
+<body>
+
+    <div class="hud-header">
+        <div class="hud-item active" onclick="selectTab(this, 'core')">Core</div>
+        <div class="hud-item" onclick="selectTab(this, 'chat')">Chat</div>
+        <div class="hud-item" onclick="selectTab(this, 'dashboard')">Dashboard</div>
+    </div>
+    <div class="hud-line"></div>
+
+    <iframe id="core-frame" class="view-frame active" src="core.html"></iframe>
+    <iframe id="chat-frame" class="view-frame"></iframe>
+    <iframe id="dashboard-frame" class="view-frame"></iframe>
+
+    <script>
+        const coreFrame = document.getElementById('core-frame');
+        const chatFrame = document.getElementById('chat-frame');
+        const dashboardFrame = document.getElementById('dashboard-frame');
+
+        function selectTab(element, tabName) {
+            document.querySelectorAll('.hud-item').forEach(item => item.classList.remove('active'));
+            element.classList.add('active');
+            
+            [coreFrame, chatFrame, dashboardFrame].forEach(f => f.classList.remove('active'));
+
+            if (tabName === 'chat') {
+                // بارگذاری هوشمند فقط در زمان نیاز کاربر
+                if (!chatFrame.getAttribute('src')) {
+                    chatFrame.setAttribute('src', 'chat.html');
+                }
+                chatFrame.classList.add('active');
+                coreFrame.classList.add('active');
+                coreFrame.style.opacity = '0.15';
+                coreFrame.style.transform = 'scale(0.85)';
+            } else if (tabName === 'dashboard') {
+                // بارگذاری هوشمند فقط در زمان نیاز کاربر
+                if (!dashboardFrame.getAttribute('src')) {
+                    dashboardFrame.setAttribute('src', 'dashboard.html');
+                }
+                dashboardFrame.classList.add('active');
+                coreFrame.style.opacity = '0';
+            } else {
+                coreFrame.classList.add('active');
+                coreFrame.style.opacity = '1';
+                coreFrame.style.transform = 'scale(1)';
+            }
+        }
+
+        window.addUserMessage = function(text, sender) {
+            try {
+                if(chatFrame.contentWindow && chatFrame.contentWindow.addUserMessage) {
+                    chatFrame.contentWindow.addUserMessage(text, sender);
+                }
+                if(dashboardFrame.contentWindow && dashboardFrame.contentWindow.addUserMessage) {
+                    dashboardFrame.contentWindow.dashboard_add_msg(text, sender);
+                }
+            } catch(e) {}
+        };
+
+        window.updatePrices = function(usd, coin, gold) {
+            try {
+                if(dashboardFrame.contentWindow && dashboardFrame.contentWindow.updatePrices) {
+                    dashboardFrame.contentWindow.updatePrices(usd, coin, gold);
+                }
+            } catch(e) {}
+        };
+
+        window.updateWeather = function(city, temp, humidity, condition) {
+            try {
+                if(dashboardFrame.contentWindow && dashboardFrame.contentWindow.updateWeather) {
+                    dashboardFrame.contentWindow.updateWeather(city, temp, humidity, condition);
+                }
+            } catch(e) {}
+        };
+
+        window.updateSystemStats = function(cpu, ram, disk, gpu, ip) {
+            try {
+                if(dashboardFrame.contentWindow && dashboardFrame.contentWindow.updateSystemStats) {
+                    dashboardFrame.contentWindow.updateSystemStats(cpu, ram, disk, gpu, ip);
+                }
+            } catch(e) {}
+        };
+
+        window.setSpeakingState = function(state) {
+            try {
+                if(coreFrame.contentWindow && coreFrame.contentWindow.setSpeakingState) {
+                    coreFrame.contentWindow.setSpeakingState(state);
+                }
+            } catch(e) {}
+        };
+    </script>
+</body>
+</html>

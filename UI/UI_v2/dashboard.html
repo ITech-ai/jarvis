@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; font-family: 'Courier New', Courier, monospace; color: #fffae0; }
+        .dashboard-layout { position: absolute; top: 12%; left: 50%; transform: translateX(-50%); width: 96%; height: 83vh; display: grid; grid-template-columns: 330px 1fr 330px; gap: 20px; }
+        .hud-panel { background: linear-gradient(135deg, rgba(25, 22, 5, 0.4) 0%, rgba(10, 8, 2, 0.7) 100%); border: 1px solid rgba(250, 223, 57, 0.15); border-radius: 8px; padding: 20px; position: relative; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8); backdrop-filter: blur(15px); display: flex; flex-direction: column; overflow: hidden; }
+        .hud-panel::before, .hud-panel::after { content: ''; position: absolute; width: 12px; height: 12px; border-color: #fadf39; border-style: solid; opacity: 0.6; }
+        .hud-panel::before { top: 0; left: 0; border-width: 2px 0 0 2px; }
+        .hud-panel::after { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+        .panel-header { font-size: 11px; font-weight: bold; color: #fadf39; letter-spacing: 2px; border-bottom: 1px solid rgba(250, 223, 57, 0.2); padding-bottom: 8px; margin-bottom: 15px; text-transform: uppercase; }
+        .data-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid rgba(250, 223, 57, 0.05); background: rgba(250, 223, 57, 0.01); margin-bottom: 8px; border-radius: 4px; }
+        .data-label { font-size: 12px; color: rgba(255, 255, 255, 0.7); }
+        .data-value { font-size: 13px; color: #fff; font-weight: bold; }
+        .data-value.currency { color: #fadf39; text-shadow: 0 0 8px rgba(250, 223, 57, 0.4); }
+        .chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; justify-content: space-between; }
+        .chat-messages { flex: 1; padding: 10px 0; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .message { max-width: 85%; padding: 10px 14px; border-radius: 8px; font-size: 13px; line-height: 1.4; }
+        .message.jarvis { align-self: flex-start; background: rgba(250, 223, 57, 0.03); border: 1px solid rgba(250, 223, 57, 0.15); color: #fffae0; }
+        .message.user { align-self: flex-end; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; }
+        .chat-input-container { display: flex; background: rgba(15, 12, 3, 0.6); border: 1px solid rgba(250, 223, 57, 0.3); border-radius: 25px; padding: 4px 10px 4px 20px; align-items: center; }
+        .chat-input { flex: 1; background: transparent; border: none; outline: none; color: #fffae0; font-family: 'Courier New'; font-size: 14px; padding: 8px 0; }
+        .send-btn { background: #fadf39; color: #000; border: none; width: 34px; height: 34px; border-radius: 50%; font-weight: bold; cursor: pointer; }
+        .typing-cursor { display: inline-block; width: 6px; height: 12px; background: #fadf39; margin-left: 2px; animation: blink 0.7s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <div class="hud-panel">
+            <div class="panel-header">// FINANCIAL INDEXES</div>
+            <div class="data-row"><div class="data-label">US Dollar (USD)</div><div class="data-value currency" id="price-usd">در حال دریافت...</div></div>
+            <div class="data-row"><div class="data-label">Emami Coin</div><div class="data-value currency" id="price-coin">در حال دریافت...</div></div>
+            <div class="data-row"><div class="data-label">Gold 18k (per g)</div><div class="data-value currency" id="price-gold">در حال دریافت...</div></div>
+            <div class="panel-header" style="margin-top: 15px;">// SYSTEM TELEMETRY</div>
+            <div class="data-row"><div class="data-label">CPU Usage</div><div class="data-value" id="sys-cpu" style="color: #fadf39;">-- %</div></div>
+            <div class="data-row"><div class="data-label">RAM Usage</div><div class="data-value" id="sys-ram" style="color: #fadf39;">-- %</div></div>
+            <div class="data-row"><div class="data-label">Disk Usage</div><div class="data-value" id="sys-disk" style="color: #fadf39;">-- %</div></div>
+            <div class="data-row"><div class="data-label">GPU Usage</div><div class="data-value" id="sys-gpu" style="color: #fadf39;">-- %</div></div>
+            <div class="data-row"><div class="data-label">Public IP</div><div class="data-value" id="sys-ip" style="font-size: 11px;">Scanning...</div></div>
+        </div>
+        <div class="hud-panel chat-area">
+            <div class="panel-header">// MAINFRAME CHAT INTERFACE</div>
+            <div class="chat-messages" id="dashChatBox"><div class="message jarvis">Waiting for text query strings, sir.</div></div>
+            <div class="chat-input-container">
+                <input type="text" id="userInput" class="chat-input" placeholder="Type data stream request..." autocomplete="off">
+                <button class="send-btn" id="sendBtn">➔</button>
+            </div>
+        </div>
+        <div class="hud-panel">
+            <div class="panel-header">// METEOROLOGICAL TELEMETRY</div>
+            <div class="data-row"><div class="data-label">Target City</div><div class="data-value" id="weather-city">Tehran</div></div>
+            <div class="data-row"><div class="data-label">Temperature</div><div class="data-value" id="weather-temp">--°C</div></div>
+            <div class="data-row"><div class="data-label">Humidity</div><div class="data-value" id="weather-humidity">--%</div></div>
+            <div class="data-row"><div class="data-label">Condition</div><div class="data-value" style="color: #fadf39;" id="weather-condition">Scanning...</div></div>
+        </div>
+    </div>
+    <script>
+        const dashChatBox = document.getElementById('dashChatBox');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+
+        function handleSend() {
+            const text = userInput.value.trim();
+            if (!text) return;
+            userInput.value = '';
+            if (window.parent && window.parent.pywebview) {
+                window.parent.pywebview.api.process_text_input(text);
+            }
+        }
+
+        sendBtn.addEventListener('click', handleSend);
+        userInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSend(); });
+
+        window.dashboard_add_msg = function(text, sender) {
+            if (!text || !text.trim() || !dashChatBox) return;
+            const msgDiv = document.createElement('div'); msgDiv.classList.add('message', sender);
+            if(sender === 'user') { msgDiv.innerText = text; dashChatBox.appendChild(msgDiv); }
+            else {
+                dashChatBox.appendChild(msgDiv); let i = 0;
+                const cursor = document.createElement('span'); cursor.classList.add('typing-cursor'); msgDiv.appendChild(cursor);
+                function typeEffect() {
+                    if(i < text.length) { cursor.insertAdjacentText('beforebegin', text.charAt(i)); i++; dashChatBox.scrollTop = dashChatBox.scrollHeight; setTimeout(typeEffect, 15); }
+                    else { cursor.remove(); }
+                }
+                typeEffect();
+            }
+            dashChatBox.scrollTop = dashChatBox.scrollHeight;
+        };
+
+        window.updatePrices = function(usd, coin, gold) {
+            if(usd && document.getElementById('price-usd')) document.getElementById('price-usd').innerText = usd;
+            if(coin && document.getElementById('price-coin')) document.getElementById('price-coin').innerText = coin;
+            if(gold && document.getElementById('price-gold')) document.getElementById('price-gold').innerText = gold;
+        };
+        window.updateWeather = function(city, temp, humidity, condition) {
+            if(city && document.getElementById('weather-city')) document.getElementById('weather-city').innerText = city;
+            if(temp && document.getElementById('weather-temp')) document.getElementById('weather-temp').innerText = temp + '°C';
+            if(humidity && document.getElementById('weather-humidity')) document.getElementById('weather-humidity').innerText = humidity + '%';
+            if(condition && document.getElementById('weather-condition')) document.getElementById('weather-condition').innerText = condition;
+        };
+        window.updateSystemStats = function(cpu, ram, disk, gpu, ip) {
+            if(cpu && document.getElementById('sys-cpu')) document.getElementById('sys-cpu').innerText = cpu + ' %';
+            if(ram && document.getElementById('sys-ram')) document.getElementById('sys-ram').innerText = ram + ' %';
+            if(disk && document.getElementById('sys-disk')) document.getElementById('sys-disk').innerText = disk + ' %';
+            if(gpu && document.getElementById('sys-gpu')) document.getElementById('sys-gpu').innerText = gpu + ' %';
+            if(ip && document.getElementById('sys-ip')) document.getElementById('sys-ip').innerText = ip;
+        };
+    </script>
+</body>
+</html>
