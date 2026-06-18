@@ -51,17 +51,4 @@ This project is crafted with passion by:
 
 Arlo (Creator & Lead Developer)
 
-Arad
-
-Amir
-
-📝 Roadmap
-[x] Design the frontend with the signature yellow theme
-
-[x] Implement the core Python backend logic
-
-[ ] Integrate advanced AI and external APIs
-
-[ ] Implement Voice Recognition & Speech-to-Text
-
 "The greatest systems are built from the smallest ideas." 🟡
