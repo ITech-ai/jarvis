@@ -11,6 +11,9 @@ def listen():
             audio = r.listen(source)
 
         text = r.recognize_google(audio, language="fa-IR")#fa-IR   en-US
+
         print( text)
         return text
     except:pass
+    
+listen()
