@@ -45,10 +45,11 @@ cd dariush
 Run the core application:
 python main.py
 ```
+---
 
-👥 Development Team
+## 👥 Development
 This project is crafted with passion by:
 
-Arlo (Creator & Lead Developer)
+**`Arlo (Creator & Lead Developer)`**
 
 "The greatest systems are built from the smallest ideas." 🟡
