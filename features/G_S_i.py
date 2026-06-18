@@ -1,41 +1,52 @@
-import psutil
-import GPUtil
+import threading
 import requests
+import psutil
 
-# تعریف آی‌پی بیرون از تابع به عنوان حافظه موقت (Cache)
-_saved_ip = None
+# جلوگیری از کرش در صورت عدم نصب کتابخانه گرافیک روی سیستم‌های مختلف
+try:
+    import GPUtil
+except ImportError:
+    GPUtil = None
+
+# حافظه موقت برای آی‌پی عمومی
+_saved_ip = "Scanning..."
+
+def _fetch_ip_in_background():
+    """این تابع در پس‌زمینه اجرا شده و سرعت سیستم را قفل نمی‌کند"""
+    global _saved_ip
+    try:
+        # درخواست گرفتن آی‌پی با لود غیرهمزمان
+        _saved_ip = requests.get("https://api.ipify.org", timeout=3).text
+    except Exception:
+        _saved_ip = "OFFLINE / ERROR"
+
+# استارت زدن ترد دریافت آی‌پی بلافاصله پس از اجرای برنامه
+threading.Thread(target=_fetch_ip_in_background, daemon=True).start()
 
 def get_SI():    
-    global _saved_ip
     try:
         cpu = psutil.cpu_percent()
         ram = psutil.virtual_memory().percent
         disk = psutil.disk_usage("/").percent
         
         gpu = 0
-        try:
-            gpus = GPUtil.getGPUs()
-            if gpus:
-                gpu = int(gpus[0].load * 100)
-        except Exception:
-            gpu = 0
-            
-        # فقط اگر آی‌پی را نداشتیم درخواست وب بفرست
-        if _saved_ip is None or _saved_ip == "CONNECTION ERROR":
+        if GPUtil:
             try:
-                _saved_ip = requests.get("https://api.ipify.org", timeout=2).text
+                gpus = GPUtil.getGPUs()
+                if gpus:
+                    gpu = int(gpus[0].load * 100)
             except Exception:
-                _saved_ip = "CONNECTION ERROR"
+                gpu = 0
             
         system_data = {
             "cpu": cpu,
             "ram": ram,
             "disk": disk,
             "gpu": gpu,
-            "ip": _saved_ip
+            "ip": _saved_ip  # استفاده فوری از کش بدون قفل کردن رندر فرانت
         }
         return system_data
         
     except Exception as e:
-        print(f"Error in get_SI: {e}")
+        print(f"Error in get_SI module: {e}")
         return None
