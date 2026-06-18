@@ -35,7 +35,7 @@ To get the project running locally, follow these steps:
 
 1. Clone the repository:
 
-git clone [https://github.com/your-username/dariush.git](https://github.com/ITech-ai/dariush.git)
+git clone [https://github.com/ITech-ai/dariush.git](https://github.com/ITech-ai/dariush.git)
 Navigate to the project directory:
 
 ```
