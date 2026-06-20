@@ -1,0 +1,135 @@
+{
+    "weekly_tasks": [
+        {
+            "day": "Saturday",
+            "tasks": [
+                {
+                    "id": 1,
+                    "title": "Review Godot character animations and states",
+                    "priority": "High",
+                    "completed": false
+                },
+                {
+                    "id": 3,
+                    "title": "Fix TileMap physics bugs",
+                    "priority": "High",
+                    "completed": false
+                },
+                {
+                    "id": 4,
+                    "title": "Check CPU logs",
+                    "priority": "Medium",
+                    "completed": false
+                }
+            ]
+        },
+        {
+            "day": "Sunday",
+            "tasks": [
+                {
+                    "id": 1,
+                    "title": "Fix audio and network driver issues on Ubuntu",
+                    "priority": "High",
+                    "completed": false
+                },
+                {
+                    "id": 2,
+                    "title": "Read a chapter of OpenCV and image processing docs",
+                    "priority": "Low",
+                    "completed": false
+                }
+            ]
+        },
+        {
+            "day": "Monday",
+            "tasks": [
+                {
+                    "id": 1,
+                    "title": "Refactor Python GUI and customize UI stylesheet",
+                    "priority": "Medium",
+                    "completed": false
+                },
+                {
+                    "id": 2,
+                    "title": "Organize GitHub repository and update project README",
+                    "priority": "Low",
+                    "completed": true
+                },
+                {
+                    "id": 3,
+                    "title": "Debug OpenCV webcam stream",
+                    "priority": "Medium",
+                    "completed": false
+                }
+            ]
+        },
+        {
+            "day": "Tuesday",
+            "tasks": [
+                {
+                    "id": 1,
+                    "title": "Implement physics and collision logic for TileMap",
+                    "priority": "High",
+                    "completed": false
+                },
+                {
+                    "id": 2,
+                    "title": "Backup critical configuration files to external drive",
+                    "priority": "Medium",
+                    "completed": false
+                }
+            ]
+        },
+        {
+            "day": "Wednesday",
+            "tasks": [
+                {
+                    "id": 1,
+                    "title": "Integrate new deep learning model with the chat module",
+                    "priority": "High",
+                    "completed": false
+                },
+                {
+                    "id": 2,
+                    "title": "Optimize system memory management script",
+                    "priority": "Medium",
+                    "completed": true
+                }
+            ]
+        },
+        {
+            "day": "Thursday",
+            "tasks": [
+                {
+                    "id": 1,
+                    "title": "Test neon yellow theme accents on the desktop layout",
+                    "priority": "Low",
+                    "completed": false
+                },
+                {
+                    "id": 2,
+                    "title": "Clean up development workspace and delete old cache",
+                    "priority": "Low",
+                    "completed": false
+                }
+            ]
+        },
+        {
+            "day": "Friday",
+            "tasks": [
+                {
+                    "id": 1,
+                    "title": "Run a full system benchmark and check hardware temperatures",
+                    "priority": "Medium",
+                    "completed": false
+                },
+                {
+                    "id": 2,
+                    "title": "Plan development milestones and tasks for next week",
+                    "priority": "High",
+                    "completed": false
+                }
+            ]
+        }
+    ]
+}
