@@ -3,17 +3,19 @@ import speech_recognition as sr
 r = sr.Recognizer()
 mic = sr.Microphone()
 
-print("Listen...")
+print("Voice Recognition System Ready...")
 
 def listen():
-    try :
+    try:
         with mic as source:
-            audio = r.listen(source)
+            r.adjust_for_ambient_noise(source, duration=0.5) 
+            audio = r.listen(source, timeout=5, phrase_time_limit=8)
 
-        text = r.recognize_google(audio, language="fa-IR")#fa-IR   en-US
+        text = r.recognize_google(audio, language="fa-IR")
+        print(text)
 
-        print( text)
         return text
-    except:pass
-    
-listen()
+    except:
+        pass
+
+
