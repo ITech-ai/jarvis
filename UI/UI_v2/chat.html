@@ -3,55 +3,308 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; font-family: 'Courier New', Courier, monospace; }
-        .chat-overlay {
-            position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%);
-            width: 90%; max-width: 650px; height: 60vh;
-            background: linear-gradient(135deg, rgba(25, 22, 5, 0.2) 0%, rgba(10, 8, 2, 0.5) 100%);
-            border: 1px solid rgba(250, 223, 57, 0.2); border-radius: 12px;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px); display: flex; flex-direction: column; overflow: hidden;
+        /* ============================================================
+           DARIUSH MAINFRAME OS — Chat Overlay
+           Floating chat panel rendered on top of the core visualizer.
+           Classes use 'jarvis' as identifier — do NOT change (Python
+           backend references these class names).
+        ============================================================ */
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
         }
-        .chat-header { padding: 12px 20px; border-bottom: 1px solid rgba(250, 223, 57, 0.15); background: rgba(15, 12, 3, 0.4); color: #fadf39; font-size: 11px; letter-spacing: 1px; }
-        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
-        .chat-messages::-webkit-scrollbar { width: 4px; }
-        .chat-messages::-webkit-scrollbar-thumb { background: rgba(250, 223, 57, 0.2); border-radius: 4px; }
-        .message { max-width: 85%; padding: 10px 14px; border-radius: 8px; font-size: 13px; line-height: 1.4; }
-        .message.jarvis { align-self: flex-start; background: rgba(250, 223, 57, 0.03); border: 1px solid rgba(250, 223, 57, 0.15); color: #fffae0; border-top-left-radius: 0; }
-        .message.jarvis::before { content: "JARVIS //"; display: block; font-size: 9px; color: #fadf39; margin-bottom: 4px; }
-        .message.user { align-self: flex-end; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.1); color: #ffffff; border-top-right-radius: 0; }
-        .message.user::before { content: "USER //"; display: block; font-size: 9px; color: rgba(255, 255, 255, 0.4); margin-bottom: 4px; text-align: right; }
-        .typing-cursor { display: inline-block; width: 6px; height: 12px; background: #fadf39; margin-left: 2px; animation: blink 0.7s infinite; }
-        @keyframes blink { 50% { opacity: 0; } }
+
+        /* ── Main Panel ── */
+        .chat-overlay {
+            position: absolute;
+            top: 55%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 650px;
+            height: 60vh;
+            background: linear-gradient(
+                135deg,
+                rgba(25, 22, 5, 0.2) 0%,
+                rgba(10, 8, 2, 0.5) 100%
+            );
+            border: 1px solid rgba(250, 223, 57, 0.2);
+            border-radius: 12px;
+            box-shadow:
+                0 20px 50px rgba(0, 0, 0, 0.8),
+                0 0 0 1px rgba(250, 223, 57, 0.05) inset;
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            /* entry animation */
+            animation: panelFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) both;
+        }
+
+        @keyframes panelFadeIn {
+            from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); }
+            to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        /* corner accent — top-left */
+        .chat-overlay::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 14px; height: 14px;
+            border-top: 1.5px solid rgba(250, 223, 57, 0.5);
+            border-left: 1.5px solid rgba(250, 223, 57, 0.5);
+            border-radius: 2px 0 0 0;
+            pointer-events: none;
+        }
+
+        /* corner accent — bottom-right */
+        .chat-overlay::after {
+            content: '';
+            position: absolute;
+            bottom: 0; right: 0;
+            width: 14px; height: 14px;
+            border-bottom: 1.5px solid rgba(250, 223, 57, 0.5);
+            border-right:  1.5px solid rgba(250, 223, 57, 0.5);
+            border-radius: 0 0 2px 0;
+            pointer-events: none;
+        }
+
+        /* ── Header ── */
+        .chat-header {
+            padding: 10px 20px;
+            border-bottom: 1px solid rgba(250, 223, 57, 0.12);
+            background: rgba(15, 12, 3, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* animated status dot */
+        .header-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #fadf39;
+            box-shadow: 0 0 6px rgba(250, 223, 57, 0.8);
+            animation: dotPulse 2s infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes dotPulse {
+            0%, 100% { opacity: 1;   box-shadow: 0 0 6px rgba(250, 223, 57, 0.8); }
+            50%       { opacity: 0.4; box-shadow: 0 0 2px rgba(250, 223, 57, 0.2); }
+        }
+
+        .header-title {
+            color: #fadf39;
+            font-size: 10px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            flex: 1;
+        }
+
+        .header-status {
+            font-size: 9px;
+            letter-spacing: 1.5px;
+            color: rgba(250, 223, 57, 0.3);
+            text-transform: uppercase;
+        }
+
+        /* ── Message List ── */
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        /* custom scrollbar */
+        .chat-messages::-webkit-scrollbar       { width: 3px; }
+        .chat-messages::-webkit-scrollbar-track { background: transparent; }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: rgba(250, 223, 57, 0.2);
+            border-radius: 4px;
+        }
+
+        /* ── Message Bubbles ── */
+        .message {
+            max-width: 82%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+            /* bubble entry */
+            animation: bubbleIn 0.3s ease both;
+        }
+
+        @keyframes bubbleIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* DARIUSH message — left aligned */
+        .message.jarvis {
+            align-self: flex-start;
+            background: rgba(250, 223, 57, 0.03);
+            border: 1px solid rgba(250, 223, 57, 0.15);
+            border-top-left-radius: 0;
+            color: #fffae0;
+            /* left glow line */
+            box-shadow: -2px 0 8px rgba(250, 223, 57, 0.08) inset;
+        }
+
+        /* sender label above bubble */
+        .message.jarvis::before {
+            content: "DARIUSH //";
+            display: block;
+            font-size: 9px;
+            letter-spacing: 1.5px;
+            color: #fadf39;
+            margin-bottom: 5px;
+            opacity: 0.8;
+        }
+
+        /* USER message — right aligned */
+        .message.user {
+            align-self: flex-end;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-top-right-radius: 0;
+            color: #ffffff;
+        }
+
+        .message.user::before {
+            content: "USER //";
+            display: block;
+            font-size: 9px;
+            letter-spacing: 1.5px;
+            color: rgba(255, 255, 255, 0.35);
+            margin-bottom: 5px;
+            text-align: right;
+        }
+
+        /* ── Typing Cursor ── */
+        .typing-cursor {
+            display: inline-block;
+            width: 6px;
+            height: 12px;
+            background: #fadf39;
+            margin-left: 2px;
+            vertical-align: middle;
+            border-radius: 1px;
+            animation: blink 0.7s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0; }
+        }
+
+        /* ── Scan-line overlay (subtle CRT effect) ── */
+        .scanline {
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 3px,
+                rgba(0, 0, 0, 0.04) 3px,
+                rgba(0, 0, 0, 0.04) 4px
+            );
+            pointer-events: none;
+            border-radius: 12px;
+        }
     </style>
 </head>
 <body>
+
     <div class="chat-overlay">
-        <div class="chat-header">// INTERACTIVE VOICE PROTOCOL TERMINAL</div>
-        <div class="chat-messages" id="chatBox">
-            <div class="message jarvis">Secure connection established. Monitoring voice stream, sir.</div>
+
+        <!-- CRT scanline overlay -->
+        <div class="scanline"></div>
+
+        <!-- Header -->
+        <div class="chat-header">
+            <div class="header-dot"></div>
+            <span class="header-title">DARIUSH // Interactive Voice Protocol Terminal</span>
+            <span class="header-status">SECURE</span>
         </div>
+
+        <!-- Messages -->
+        <div class="chat-messages" id="chatBox">
+            <div class="message jarvis">
+                اتصال امن برقرار شد. در حال پایش جریان صوتی، قربان.
+            </div>
+        </div>
+
     </div>
+
     <script>
+        /* ============================================================
+           DARIUSH — Chat Message Handler
+           Called from Python backend via pywebview bridge.
+
+           window.addUserMessage(text, sender)
+             text   : string — message content
+             sender : 'user' | 'jarvis'
+
+           'jarvis' messages are typed out character by character
+           with a blinking cursor for a terminal feel.
+        ============================================================ */
+
         const chatBox = document.getElementById('chatBox');
+
         window.addUserMessage = function(text, sender) {
             if (!text || !text.trim() || !chatBox) return;
+
             const msgDiv = document.createElement('div');
             msgDiv.classList.add('message', sender);
-            if(sender === 'user') {
-                msgDiv.innerText = text; chatBox.appendChild(msgDiv);
+
+            if (sender === 'user') {
+                /* ── User bubble: instant display ── */
+                msgDiv.innerText = text;
+                chatBox.appendChild(msgDiv);
+                chatBox.scrollTop = chatBox.scrollHeight;
+
             } else {
-                chatBox.appendChild(msgDiv); let i = 0;
-                const cursor = document.createElement('span'); cursor.classList.add('typing-cursor'); msgDiv.appendChild(cursor);
+                /* ── DARIUSH bubble: typewriter effect ── */
+                chatBox.appendChild(msgDiv);
+
+                /* blinking cursor placeholder */
+                const cursor = document.createElement('span');
+                cursor.classList.add('typing-cursor');
+                msgDiv.appendChild(cursor);
+
+                let i = 0;
+
                 function typeEffect() {
-                    if(i < text.length) {
-                        cursor.insertAdjacentText('beforebegin', text.charAt(i)); i++;
-                        chatBox.scrollTop = chatBox.scrollHeight; setTimeout(typeEffect, 15);
-                    } else { cursor.remove(); }
+                    if (i < text.length) {
+                        cursor.insertAdjacentText('beforebegin', text.charAt(i));
+                        i++;
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                        /* slight randomness in typing speed for realism */
+                        const delay = 12 + Math.random() * 10;
+                        setTimeout(typeEffect, delay);
+                    } else {
+                        /* remove cursor when done */
+                        cursor.remove();
+                    }
                 }
+
                 typeEffect();
+                chatBox.scrollTop = chatBox.scrollHeight;
             }
-            chatBox.scrollTop = chatBox.scrollHeight;
         };
     </script>
+
 </body>
 </html>

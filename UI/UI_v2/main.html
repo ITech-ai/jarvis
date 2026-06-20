@@ -3,186 +3,793 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS Mainframe Operating System</title>
+    <title>DARIUSH Mainframe Operating System</title>
     <style>
+        /* ============================================================
+           DARIUSH MAINFRAME OS — Main Shell
+           Acts as the root container for all views.
+           Manages:
+             - Status bar (top)
+             - Sidebar navigation (left, expand on hover)
+             - Iframe view switching (core / chat / dashboard)
+             - Bridge functions to child iframes
+           IDs and bridge function names must NOT be changed —
+           Python backend calls them via pywebview.
+        ============================================================ */
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body, html {
-            margin: 0;
-            padding: 0;
             width: 100%;
             height: 100%;
-            background-color: #020201; 
+            background-color: #020201;
             overflow: hidden;
             font-family: 'Courier New', Courier, monospace;
             color: #fffae0;
         }
 
-        .hud-header {
-            position: absolute;
-            top: 3%; 
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 100;
-            display: flex;
-            gap: 25px;
-            align-items: center;
-            pointer-events: auto;
+        /* ============================================================
+           AMBIENT BACKGROUND
+           Subtle radial glow in the center — depth effect.
+        ============================================================ */
+        .bg-glow {
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 60% 50% at 50% 50%,
+                    rgba(212, 175, 55, 0.04) 0%,
+                    transparent 70%);
+            pointer-events: none;
+            z-index: 0;
         }
 
-        .hud-item {
-            color: rgba(250, 223, 57, 0.4); 
-            font-size: 13px;
-            font-weight: bold;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            cursor: pointer;
-            padding: 5px 12px;
-            transition: all 0.4s ease;
+        /* CRT scanlines over everything */
+        .scanline-global {
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.03) 2px,
+                rgba(0, 0, 0, 0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        /* ============================================================
+           CORNER DECORATIONS
+        ============================================================ */
+        .corner-deco {
+            position: fixed;
+            width: 45px;
+            height: 45px;
+            pointer-events: none;
+            z-index: 190;
+        }
+
+        .corner-deco::before,
+        .corner-deco::after {
+            content: '';
+            position: absolute;
+            background: rgba(250, 223, 57, 0.22);
+        }
+
+        .corner-deco::before { width: 100%; height: 1px; top: 0; left: 0; }
+        .corner-deco::after  { width: 1px; height: 100%; top: 0; left: 0; }
+
+        .corner-tl { top: 28px; left: 72px; }
+        .corner-tr { top: 28px; right: 0;  transform: scaleX(-1); }
+        .corner-bl { bottom: 0; left: 72px; transform: scaleY(-1); }
+        .corner-br { bottom: 0; right: 0;  transform: scale(-1, -1); }
+
+        /* ============================================================
+           TOP STATUS BAR
+        ============================================================ */
+        .status-bar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 28px;
+            background: rgba(4, 3, 1, 0.92);
+            border-bottom: 1px solid rgba(250, 223, 57, 0.08);
             display: flex;
             align-items: center;
-            gap: 6px;
+            justify-content: space-between;
+            padding: 0 18px;
+            z-index: 300;
+            backdrop-filter: blur(12px);
+        }
+
+        .status-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        /* animated online dot */
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #fadf39;
+            box-shadow: 0 0 6px rgba(250, 223, 57, 0.9);
+            animation: dotPulse 2s infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes dotPulse {
+            0%, 100% { opacity: 1;   box-shadow: 0 0 6px rgba(250, 223, 57, 0.9); }
+            50%       { opacity: 0.4; box-shadow: 0 0 2px rgba(250, 223, 57, 0.2); }
+        }
+
+        .status-label {
+            font-size: 9px;
+            letter-spacing: 2.5px;
+            color: rgba(250, 223, 57, 0.45);
+            text-transform: uppercase;
+        }
+
+        /* separator pipe */
+        .status-sep {
+            width: 1px;
+            height: 12px;
+            background: rgba(250, 223, 57, 0.12);
+        }
+
+        .status-sub {
+            font-size: 9px;
+            letter-spacing: 1.5px;
+            color: rgba(250, 223, 57, 0.2);
+            text-transform: uppercase;
+        }
+
+        .status-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        .status-time {
+            font-size: 10px;
+            letter-spacing: 1.5px;
+            color: rgba(250, 223, 57, 0.5);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .status-date {
+            font-size: 9px;
+            letter-spacing: 1px;
+            color: rgba(250, 223, 57, 0.2);
+        }
+
+        .status-version {
+            font-size: 9px;
+            letter-spacing: 1.5px;
+            color: rgba(250, 223, 57, 0.15);
+        }
+
+        /* ============================================================
+           SIDEBAR NAVIGATION
+        ============================================================ */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 28px;
+            bottom: 0;
+            width: 72px;
+            background: linear-gradient(
+                180deg,
+                rgba(8, 7, 2, 0.97) 0%,
+                rgba(4, 3, 1, 0.99) 100%
+            );
+            border-right: 1px solid rgba(250, 223, 57, 0.07);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 18px 0;
+            backdrop-filter: blur(20px);
+            /* expand on hover */
+            transition: width 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+
+        .sidebar:hover { width: 224px; }
+
+        /* ── Logo ── */
+        .sidebar-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: linear-gradient(135deg,
+                rgba(250, 223, 57, 0.1),
+                rgba(250, 223, 57, 0.03));
+            border: 1px solid rgba(250, 223, 57, 0.22);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 6px;
+            flex-shrink: 0;
+            position: relative;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .sidebar:hover .sidebar-logo {
+            box-shadow: 0 0 18px rgba(250, 223, 57, 0.12);
+        }
+
+        .sidebar-logo svg { width: 20px; height: 20px; }
+
+        /* system name under logo — visible on expand */
+        .sidebar-name {
+            font-size: 10px;
+            letter-spacing: 3.5px;
+            color: rgba(250, 223, 57, 0.0);
+            text-transform: uppercase;
+            margin-bottom: 18px;
+            white-space: nowrap;
+            opacity: 0;
+            transition: color 0.35s ease, opacity 0.35s ease;
+            flex-shrink: 0;
+        }
+
+        .sidebar:hover .sidebar-name {
+            color: rgba(250, 223, 57, 0.45);
+            opacity: 1;
+        }
+
+        /* ── Divider ── */
+        .sidebar-divider {
+            width: 30px;
+            height: 1px;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(250, 223, 57, 0.18),
+                transparent);
+            margin: 10px 0;
+            flex-shrink: 0;
+            transition: width 0.38s ease;
+        }
+
+        .sidebar:hover .sidebar-divider { width: 184px; }
+
+        /* ── Nav item list ── */
+        .nav-items {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            width: 100%;
+            padding: 0 10px;
+            flex: 1;
+        }
+
+        /* ── Single nav item ── */
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 13px;
+            padding: 10px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.22s ease, border-color 0.22s ease;
+            white-space: nowrap;
+            border: 1px solid transparent;
+            min-height: 44px;
+            overflow: hidden;
             user-select: none;
         }
 
-        .hud-item::before {
-            content: '■';
-            font-size: 8px;
-            color: transparent;
-            transition: all 0.4s ease;
-        }
-
-        .hud-item:hover, .hud-item.active {
-            color: #fadf39; 
-            text-shadow: 0 0 10px rgba(250, 223, 57, 0.8), 0 0 20px rgba(250, 223, 57, 0.4);
-        }
-
-        .hud-item:hover::before, .hud-item.active::before {
-            color: #fadf39;
-            text-shadow: 0 0 8px #fadf39;
-        }
-
-        .hud-line {
+        /* active indicator — left bar */
+        .nav-item::before {
+            content: '';
             position: absolute;
-            top: calc(3% + 35px);
-            left: 50%;
-            transform: translateX(-50%);
-            width: 320px;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(250, 223, 57, 0.3), rgba(250, 223, 57, 0.3), transparent);
-            z-index: 100;
+            left: 0; top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 0;
+            background: #fadf39;
+            border-radius: 0 3px 3px 0;
+            box-shadow: 0 0 8px rgba(250, 223, 57, 0.5);
+            transition: height 0.22s ease;
+        }
+
+        .nav-item:hover::before,
+        .nav-item.active::before { height: 55%; }
+
+        .nav-item:hover {
+            background: rgba(250, 223, 57, 0.045);
+            border-color: rgba(250, 223, 57, 0.09);
+        }
+
+        .nav-item.active {
+            background: rgba(250, 223, 57, 0.07);
+            border-color: rgba(250, 223, 57, 0.14);
+        }
+
+        /* ── Icon wrapper ── */
+        .nav-icon {
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .nav-icon svg {
+            width: 17px;
+            height: 17px;
+            fill: none;
+            stroke: rgba(250, 223, 57, 0.3);
+            stroke-width: 1.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: stroke 0.22s ease, filter 0.22s ease;
+        }
+
+        .nav-item:hover .nav-icon svg,
+        .nav-item.active .nav-icon svg {
+            stroke: #fadf39;
+            filter: drop-shadow(0 0 4px rgba(250, 223, 57, 0.55));
+        }
+
+        /* secondary icon dimmer */
+        .nav-item.secondary .nav-icon svg { stroke: rgba(255, 255, 255, 0.13); }
+        .nav-item.secondary:hover .nav-icon svg { stroke: rgba(255, 255, 255, 0.45); filter: none; }
+        .nav-item.secondary::before { background: rgba(255, 255, 255, 0.25); box-shadow: none; }
+
+        /* ── Text block ── */
+        .nav-text-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            opacity: 0;
+            transform: translateX(-6px);
+            transition: opacity 0.3s ease 0.06s, transform 0.3s ease 0.06s;
             pointer-events: none;
+        }
+
+        .sidebar:hover .nav-text-wrap {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .nav-label {
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 1.8px;
+            color: rgba(255, 250, 224, 0.45);
+            text-transform: uppercase;
+            transition: color 0.22s ease;
+        }
+
+        .nav-sublabel {
+            font-size: 9px;
+            letter-spacing: 0.8px;
+            color: rgba(250, 223, 57, 0.22);
+        }
+
+        .nav-item:hover  .nav-label { color: #fffae0; }
+        .nav-item.active .nav-label { color: #fadf39; }
+
+        .nav-item.secondary .nav-label       { color: rgba(255, 255, 255, 0.22); }
+        .nav-item.secondary:hover .nav-label { color: rgba(255, 255, 255, 0.55); }
+
+        /* ── Badge ── */
+        .nav-badge {
+            position: absolute;
+            top: 8px; right: 8px;
+            background: rgba(250, 223, 57, 0.1);
+            border: 1px solid rgba(250, 223, 57, 0.25);
+            color: #fadf39;
+            font-size: 7px;
+            letter-spacing: 0.8px;
+            padding: 2px 5px;
+            border-radius: 8px;
+            opacity: 0;
+            transition: opacity 0.3s ease 0.1s;
+            text-transform: uppercase;
+        }
+
+        .sidebar:hover .nav-badge { opacity: 1; }
+
+        /* ── Tooltip (collapsed state only) ── */
+        .nav-tooltip {
+            position: absolute;
+            left: 78px;
+            background: rgba(8, 7, 2, 0.96);
+            border: 1px solid rgba(250, 223, 57, 0.18);
+            color: #fadf39;
+            font-size: 9px;
+            letter-spacing: 1.8px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateX(-4px);
+            transition: opacity 0.18s ease, transform 0.18s ease;
+            z-index: 999;
+            text-transform: uppercase;
+        }
+
+        .nav-item:hover    .nav-tooltip { opacity: 1; transform: translateX(0); }
+        .sidebar:hover     .nav-tooltip { opacity: 0 !important; }
+
+        /* ── Bottom section ── */
+        .sidebar-bottom {
+            width: 100%;
+            padding: 0 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        /* ============================================================
+           BREADCRUMB
+        ============================================================ */
+        .breadcrumb {
+            position: fixed;
+            top: 36px;
+            left: 88px;
+            z-index: 190;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            pointer-events: none;
+            animation: breadcrumbIn 0.5s ease both;
+        }
+
+        @keyframes breadcrumbIn {
+            from { opacity: 0; transform: translateX(-6px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        .breadcrumb-root {
+            font-size: 9px;
+            letter-spacing: 2px;
+            color: rgba(250, 223, 57, 0.22);
+            text-transform: uppercase;
+        }
+
+        .breadcrumb-sep {
+            font-size: 9px;
+            color: rgba(250, 223, 57, 0.12);
+        }
+
+        .breadcrumb-current {
+            font-size: 9px;
+            letter-spacing: 2px;
+            color: rgba(250, 223, 57, 0.5);
+            text-transform: uppercase;
+            transition: color 0.3s ease;
+        }
+
+        /* ============================================================
+           CONTENT AREA — iframe host
+        ============================================================ */
+        .content-area {
+            position: fixed;
+            top: 28px;
+            left: 72px;
+            right: 0;
+            bottom: 0;
+            z-index: 1;
         }
 
         .view-frame {
             position: absolute;
-            top: 0;
-            left: 0;
+            top: 0; left: 0;
             width: 100%;
             height: 100%;
             border: none;
-            z-index: 1;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.5s ease, transform 0.5s ease;
+            transition: opacity 0.45s ease, transform 0.45s ease;
         }
 
         .view-frame.active {
             opacity: 1;
             pointer-events: auto;
         }
-
-        #core-frame { z-index: 2; }
-        #chat-frame, #dashboard-frame { z-index: 5; }
     </style>
 </head>
 <body>
 
-    <div class="hud-header">
-        <div class="hud-item active" onclick="selectTab(this, 'core')">Core</div>
-        <div class="hud-item" onclick="selectTab(this, 'chat')">Chat</div>
-        <div class="hud-item" onclick="selectTab(this, 'dashboard')">Dashboard</div>
-    </div>
-    <div class="hud-line"></div>
+    <!-- ── Ambient & FX layers ── -->
+    <div class="bg-glow"></div>
+    <div class="scanline-global"></div>
 
-    <iframe id="core-frame" class="view-frame active" src="core.html"></iframe>
-    <iframe id="chat-frame" class="view-frame"></iframe>
-    <iframe id="dashboard-frame" class="view-frame"></iframe>
+    <!-- ── Corner decorations ── -->
+    <div class="corner-deco corner-tl"></div>
+    <div class="corner-deco corner-tr"></div>
+    <div class="corner-deco corner-bl"></div>
+    <div class="corner-deco corner-br"></div>
+
+    <!-- ══════════════════════════════════════
+         TOP STATUS BAR
+    ══════════════════════════════════════ -->
+    <div class="status-bar">
+        <div class="status-bar-left">
+            <div class="status-dot"></div>
+            <span class="status-label">DARIUSH // MAINFRAME OS</span>
+            <div class="status-sep"></div>
+            <span class="status-sub" id="active-view-label">CORE</span>
+        </div>
+        <div class="status-bar-right">
+            <span class="status-date"  id="date-display">--/--/----</span>
+            <span class="status-time"  id="clock">--:--:--</span>
+            <span class="status-version">V 4.1.7</span>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         SIDEBAR
+    ══════════════════════════════════════ -->
+    <nav class="sidebar">
+
+        <!-- Logo -->
+        <div class="sidebar-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fadf39" stroke-width="1.5">
+                <circle cx="12" cy="12" r="9" stroke-opacity="0.4"/>
+                <path d="M12 3L12 21M3 12L21 12" stroke-opacity="0.25"/>
+                <circle cx="12" cy="12" r="3"
+                    fill="rgba(250,223,57,0.15)" stroke="#fadf39"/>
+            </svg>
+        </div>
+
+        <!-- System name -->
+        <div class="sidebar-name">DARIUSH</div>
+
+        <div class="sidebar-divider"></div>
+
+        <!-- Primary nav -->
+        <div class="nav-items">
+
+            <!-- Core -->
+            <div class="nav-item active" onclick="selectTab(this, 'core')" id="nav-core">
+                <div class="nav-icon">
+                    <svg viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="4"/>
+                        <path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
+                        <path d="M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83
+                                 M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                    </svg>
+                </div>
+                <div class="nav-text-wrap">
+                    <span class="nav-label">Core</span>
+                    <span class="nav-sublabel">Primary Interface</span>
+                </div>
+                <span class="nav-badge">LIVE</span>
+                <span class="nav-tooltip">Core</span>
+            </div>
+
+            <!-- Chat -->
+            <div class="nav-item" onclick="selectTab(this, 'chat')" id="nav-chat">
+                <div class="nav-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                    </svg>
+                </div>
+                <div class="nav-text-wrap">
+                    <span class="nav-label">Chat</span>
+                    <span class="nav-sublabel">Voice Protocol</span>
+                </div>
+                <span class="nav-tooltip">Chat</span>
+            </div>
+
+            <!-- Dashboard -->
+            <div class="nav-item" onclick="selectTab(this, 'dashboard')" id="nav-dashboard">
+                <div class="nav-icon">
+                    <svg viewBox="0 0 24 24">
+                        <rect x="3"  y="3"  width="7" height="7" rx="1"/>
+                        <rect x="14" y="3"  width="7" height="7" rx="1"/>
+                        <rect x="3"  y="14" width="7" height="7" rx="1"/>
+                        <rect x="14" y="14" width="7" height="7" rx="1"/>
+                    </svg>
+                </div>
+                <div class="nav-text-wrap">
+                    <span class="nav-label">Dashboard</span>
+                    <span class="nav-sublabel">System Monitor</span>
+                </div>
+                <span class="nav-badge">DATA</span>
+                <span class="nav-tooltip">Dashboard</span>
+            </div>
+
+        </div>
+
+        <div class="sidebar-divider"></div>
+
+        <!-- Secondary nav -->
+        <div class="sidebar-bottom">
+
+            <div class="nav-item secondary">
+                <div class="nav-icon">
+                    <svg viewBox="0 0 24 24">
+                        <circle cx="12" cy="8" r="4"/>
+                        <path d="M4 20c0-4 3.58-7 8-7s8 3 8 7"/>
+                    </svg>
+                </div>
+                <div class="nav-text-wrap">
+                    <span class="nav-label">Profile</span>
+                    <span class="nav-sublabel">User Config</span>
+                </div>
+                <span class="nav-tooltip">Profile</span>
+            </div>
+
+            <div class="nav-item secondary">
+                <div class="nav-icon">
+                    <svg viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0
+                                 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0
+                                 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0
+                                 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0
+                                 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65
+                                 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0
+                                 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0
+                                 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65
+                                 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0
+                                 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0
+                                 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65
+                                 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0
+                                 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+                    </svg>
+                </div>
+                <div class="nav-text-wrap">
+                    <span class="nav-label">Settings</span>
+                    <span class="nav-sublabel">System Config</span>
+                </div>
+                <span class="nav-tooltip">Settings</span>
+            </div>
+
+        </div>
+    </nav>
+
+    <!-- ── Breadcrumb ── -->
+    <div class="breadcrumb">
+        <span class="breadcrumb-root">DARIUSH</span>
+        <span class="breadcrumb-sep">/</span>
+        <span class="breadcrumb-current" id="breadcrumb-current">Core</span>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         CONTENT — iframe host
+    ══════════════════════════════════════ -->
+    <div class="content-area">
+        <iframe id="core-frame"      class="view-frame active" src="core.html"></iframe>
+        <iframe id="chat-frame"      class="view-frame"></iframe>
+        <iframe id="dashboard-frame" class="view-frame"></iframe>
+    </div>
 
     <script>
-        const coreFrame = document.getElementById('core-frame');
-        const chatFrame = document.getElementById('chat-frame');
+        /* ============================================================
+           DARIUSH MAINFRAME OS — Main Shell Script
+        ============================================================ */
+
+        /* ── Clock & Date ── */
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent =
+                now.toLocaleTimeString('en-US', { hour12: false });
+            document.getElementById('date-display').textContent =
+                now.toLocaleDateString('en-GB'); // DD/MM/YYYY
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        /* ── Frame references ── */
+        const coreFrame      = document.getElementById('core-frame');
+        const chatFrame      = document.getElementById('chat-frame');
         const dashboardFrame = document.getElementById('dashboard-frame');
 
-        function selectTab(element, tabName) {
-            document.querySelectorAll('.hud-item').forEach(item => item.classList.remove('active'));
-            element.classList.add('active');
-            
-            [coreFrame, chatFrame, dashboardFrame].forEach(f => f.classList.remove('active'));
+        /* ── Tab meta ── */
+        const tabMeta = {
+            core:      { label: 'Core' },
+            chat:      { label: 'Chat' },
+            dashboard: { label: 'Dashboard' },
+        };
 
+        /* ============================================================
+           selectTab(element, tabName)
+           Switches the active view, lazy-loads iframes on first visit.
+        ============================================================ */
+        function selectTab(element, tabName) {
+            /* highlight nav item */
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            element.classList.add('active');
+
+            /* update breadcrumb + status bar label */
+            const label = tabMeta[tabName].label;
+            document.getElementById('breadcrumb-current').textContent  = label;
+            document.getElementById('active-view-label').textContent   = label.toUpperCase();
+
+            /* hide all frames */
+            [coreFrame, chatFrame, dashboardFrame].forEach(f => {
+                f.classList.remove('active');
+                f.style.opacity   = '';
+                f.style.transform = '';
+            });
+
+            /* lazy-load on first visit */
+            if (tabName === 'chat' && !chatFrame.src.includes('chat.html')) {
+                chatFrame.src = 'chat.html';
+            }
+            if (tabName === 'dashboard' && !dashboardFrame.src.includes('dashboard.html')) {
+                dashboardFrame.src = 'dashboard.html';
+            }
+
+            /* show correct frame(s) */
             if (tabName === 'chat') {
-                // بارگذاری هوشمند فقط در زمان نیاز کاربر
-                if (!chatFrame.getAttribute('src')) {
-                    chatFrame.setAttribute('src', 'chat.html');
-                }
                 chatFrame.classList.add('active');
+                /* keep core in bg at reduced opacity */
                 coreFrame.classList.add('active');
-                coreFrame.style.opacity = '0.15';
-                coreFrame.style.transform = 'scale(0.85)';
+                coreFrame.style.opacity   = '0.12';
+                coreFrame.style.transform = 'scale(0.88)';
+
             } else if (tabName === 'dashboard') {
-                // بارگذاری هوشمند فقط در زمان نیاز کاربر
-                if (!dashboardFrame.getAttribute('src')) {
-                    dashboardFrame.setAttribute('src', 'dashboard.html');
-                }
                 dashboardFrame.classList.add('active');
                 coreFrame.style.opacity = '0';
+
             } else {
+                /* core view */
                 coreFrame.classList.add('active');
-                coreFrame.style.opacity = '1';
+                coreFrame.style.opacity   = '1';
                 coreFrame.style.transform = 'scale(1)';
             }
         }
 
+        /* ============================================================
+           BRIDGE FUNCTIONS
+           Called by Python backend via pywebview to push data
+           into child iframes.
+           Function signatures must NOT be changed.
+        ============================================================ */
+
+        /* Push chat message to chat + dashboard panels */
         window.addUserMessage = function(text, sender) {
             try {
-                if(chatFrame.contentWindow && chatFrame.contentWindow.addUserMessage) {
+                if (chatFrame.contentWindow?.addUserMessage)
                     chatFrame.contentWindow.addUserMessage(text, sender);
-                }
-                if(dashboardFrame.contentWindow && dashboardFrame.contentWindow.addUserMessage) {
+                if (dashboardFrame.contentWindow?.dashboard_add_msg)
                     dashboardFrame.contentWindow.dashboard_add_msg(text, sender);
-                }
             } catch(e) {}
         };
 
+        /* Push financial prices to dashboard */
         window.updatePrices = function(usd, coin, gold) {
             try {
-                if(dashboardFrame.contentWindow && dashboardFrame.contentWindow.updatePrices) {
+                if (dashboardFrame.contentWindow?.updatePrices)
                     dashboardFrame.contentWindow.updatePrices(usd, coin, gold);
-                }
             } catch(e) {}
         };
 
+        /* Push weather data to dashboard */
         window.updateWeather = function(city, temp, humidity, condition) {
             try {
-                if(dashboardFrame.contentWindow && dashboardFrame.contentWindow.updateWeather) {
+                if (dashboardFrame.contentWindow?.updateWeather)
                     dashboardFrame.contentWindow.updateWeather(city, temp, humidity, condition);
-                }
             } catch(e) {}
         };
 
+        /* Push system stats to dashboard */
         window.updateSystemStats = function(cpu, ram, disk, gpu, ip) {
             try {
-                if(dashboardFrame.contentWindow && dashboardFrame.contentWindow.updateSystemStats) {
+                if (dashboardFrame.contentWindow?.updateSystemStats)
                     dashboardFrame.contentWindow.updateSystemStats(cpu, ram, disk, gpu, ip);
-                }
             } catch(e) {}
         };
 
+        /* Set speaking state on core visualizer */
         window.setSpeakingState = function(state) {
             try {
-                if(coreFrame.contentWindow && coreFrame.contentWindow.setSpeakingState) {
+                if (coreFrame.contentWindow?.setSpeakingState)
                     coreFrame.contentWindow.setSpeakingState(state);
-                }
             } catch(e) {}
         };
     </script>
+
 </body>
 </html>

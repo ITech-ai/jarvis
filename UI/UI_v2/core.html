@@ -3,124 +3,409 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; }
-        #webgl-container { width: 100%; height: 100%; position: absolute; }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            overflow: hidden;
+        }
+        #webgl-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
     <div id="webgl-container"></div>
-    <script>
-        let isSpeaking = false; 
-        window.setSpeakingState = function(state) { isSpeaking = state; };
 
-        const JARVIS_THEME = {
-            wireframeColor: 0xd4af37, vertexColor: 0xffe89e, dustColor: 0xfadf39,         
-            laserSpikeColor: 0xc5a028, mainArcColor: new THREE.Color(0.98, 0.85, 0.35),     
-            secondaryArcColor: new THREE.Color(1.0, 0.93, 0.6), glowCoreColor: new THREE.Color(0.95, 0.78, 0.2)      
+    <script>
+        /* ============================================================
+           DARIUSH MAINFRAME OS — Core Visualizer
+           WebGL / Three.js r128
+           Renders the animated holographic sphere with:
+             - Icosahedron wireframe
+             - Orbital arc rings
+             - Particle dust cloud
+             - Laser spikes
+             - Central glow node
+           Speaking state accelerates all animations.
+        ============================================================ */
+
+        /* ── Speaking State ── */
+        let isSpeaking = false;
+        window.setSpeakingState = function(state) {
+            isSpeaking = state;
         };
 
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = 14; camera.position.y = -0.5;
+        /* ============================================================
+           THEME PALETTE
+           All colors in one place for easy tweaking.
+        ============================================================ */
+        const THEME = {
+            wireframe:      0xd4af37,
+            vertex:         0xffe89e,
+            dust:           0xfadf39,
+            laserSpike:     0xc5a028,
+            mainArc:        new THREE.Color(0.98, 0.85, 0.35),
+            secondaryArc:   new THREE.Color(1.0,  0.93, 0.60),
+            glowCore:       new THREE.Color(0.95, 0.78, 0.20),
+        };
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+        /* ============================================================
+           RENDERER SETUP
+        ============================================================ */
+        const scene    = new THREE.Scene();
+        const camera   = new THREE.PerspectiveCamera(
+            55,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000
+        );
+        camera.position.set(0, -0.5, 14);
+
+        const renderer = new THREE.WebGLRenderer({
+            antialias:        true,
+            alpha:            true,
+            powerPreference:  "high-performance"
+        });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.6; 
+        renderer.toneMapping         = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.6;
         document.getElementById('webgl-container').appendChild(renderer.domElement);
 
-        const customGlowMaterial = new THREE.ShaderMaterial({
-            uniforms: { time: { value: 0.0 }, color: { value: JARVIS_THEME.mainArcColor } },
-            vertexShader: `varying vec3 vNormal; void main() { vNormal = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-            fragmentShader: `varying vec3 vNormal; uniform vec3 color; void main() { float intensity = pow(0.75 - dot(vNormal, vec3(0, 0, 1.0)), 2.5); vec3 finalGlow = mix(color, vec3(1.0, 0.98, 0.9), intensity * 0.3); gl_FragColor = vec4(finalGlow * intensity * 4.0, 1.0); }`,
-            blending: THREE.AdditiveBlending, side: THREE.DoubleSide, transparent: true
+        /* ============================================================
+           SHARED GLOW SHADER MATERIAL
+           Used for arc rings — additive blending creates the
+           bloom / glow effect without a post-processing pass.
+        ============================================================ */
+        const glowMat = new THREE.ShaderMaterial({
+            uniforms: {
+                time:  { value: 0.0 },
+                color: { value: THEME.mainArc }
+            },
+            vertexShader: `
+                varying vec3 vNormal;
+                void main() {
+                    vNormal     = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vNormal;
+                uniform vec3  color;
+                uniform float time;
+                void main() {
+                    /* rim glow — brightest at grazing angles */
+                    float rim       = pow(0.75 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.5);
+                    /* subtle hot-white highlight */
+                    vec3  highlight = mix(color, vec3(1.0, 0.98, 0.9), rim * 0.3);
+                    /* pulsing intensity driven by time */
+                    float pulse     = 1.0 + sin(time * 2.0) * 0.08;
+                    gl_FragColor    = vec4(highlight * rim * 4.0 * pulse, 1.0);
+                }
+            `,
+            blending:    THREE.AdditiveBlending,
+            side:        THREE.DoubleSide,
+            transparent: true,
         });
 
-        const sphereGeo = new THREE.IcosahedronGeometry(3.8, 4); 
-        const sphereMat = new THREE.MeshBasicMaterial({ color: JARVIS_THEME.wireframeColor, wireframe: true, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending });
-        const coreSphere = new THREE.Mesh(sphereGeo, sphereMat); scene.add(coreSphere);
+        /* ============================================================
+           CORE SPHERE — Icosahedron Wireframe
+        ============================================================ */
+        const sphereGeo = new THREE.IcosahedronGeometry(3.8, 4);
 
-        const coreVertices = new THREE.Points(sphereGeo, new THREE.PointsMaterial({ color: JARVIS_THEME.vertexColor, size: 0.06, transparent: true, blending: THREE.AdditiveBlending }));
-        coreSphere.add(coreVertices);
+        const coreSphere = new THREE.Mesh(sphereGeo, new THREE.MeshBasicMaterial({
+            color:       THEME.wireframe,
+            wireframe:   true,
+            transparent: true,
+            opacity:     0.35,
+            blending:    THREE.AdditiveBlending,
+        }));
+        scene.add(coreSphere);
 
-        const particleCount = 2500; const particleGeo = new THREE.BufferGeometry();
-        const positions = new Float32Array(particleCount * 3); const originalPositions = new Float32Array(particleCount * 3); const randomDynamics = new Float32Array(particleCount);
-        
-        for (let i = 0; i < particleCount; i++) {
-            const u = Math.random(); const v = Math.random();
-            const theta = u * 2.0 * Math.PI; const phi = Math.acos(2.0 * v - 1.0); const r = 5.1 + Math.random() * 2.8;
-            positions[i * 3] = originalPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-            positions[i * 3 + 1] = originalPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-            positions[i * 3 + 2] = originalPositions[i * 3 + 2] = r * Math.cos(phi); 
-            randomDynamics[i] = r;
+        /* vertex dots sitting on top of the wireframe */
+        coreSphere.add(new THREE.Points(sphereGeo, new THREE.PointsMaterial({
+            color:       THEME.vertex,
+            size:        0.06,
+            transparent: true,
+            blending:    THREE.AdditiveBlending,
+        })));
+
+        /* ============================================================
+           INNER CORE SPHERE
+           Slightly smaller, counter-rotating — adds depth.
+        ============================================================ */
+        const innerSphere = new THREE.Mesh(
+            new THREE.IcosahedronGeometry(2.4, 2),
+            new THREE.MeshBasicMaterial({
+                color:       0xc8a800,
+                wireframe:   true,
+                transparent: true,
+                opacity:     0.12,
+                blending:    THREE.AdditiveBlending,
+            })
+        );
+        scene.add(innerSphere);
+
+        /* ============================================================
+           PARTICLE DUST CLOUD
+           Points scattered in a spherical shell — breathe in/out
+           via a sine wave displacement each frame.
+        ============================================================ */
+        const PARTICLE_COUNT = 2800;
+        const pGeo           = new THREE.BufferGeometry();
+        const pPos           = new Float32Array(PARTICLE_COUNT * 3);
+        const pOrigin        = new Float32Array(PARTICLE_COUNT * 3);
+        const pPhase         = new Float32Array(PARTICLE_COUNT);  // per-particle phase offset
+
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            const theta = Math.random() * 2.0 * Math.PI;
+            const phi   = Math.acos(2.0 * Math.random() - 1.0);
+            const r     = 5.1 + Math.random() * 2.8;
+
+            pPos[i*3]   = pOrigin[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+            pPos[i*3+1] = pOrigin[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+            pPos[i*3+2] = pOrigin[i*3+2] = r * Math.cos(phi);
+            pPhase[i]   = Math.random() * Math.PI * 2.0;
         }
-        particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const particleCloud = new THREE.Points(particleGeo, new THREE.PointsMaterial({ color: JARVIS_THEME.dustColor, size: 0.05, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending }));
+        pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+
+        const particleCloud = new THREE.Points(pGeo, new THREE.PointsMaterial({
+            color:       THEME.dust,
+            size:        0.055,
+            transparent: true,
+            opacity:     0.85,
+            blending:    THREE.AdditiveBlending,
+        }));
         scene.add(particleCloud);
 
-        const arcGroup = new THREE.Group(); scene.add(arcGroup);
-        const mainArc = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.10, 8, 100, Math.PI * 1.2), customGlowMaterial);
-        mainArc.rotation.x = Math.PI / 3; mainArc.rotation.y = Math.PI / 4; arcGroup.add(mainArc);
+        /* ============================================================
+           ORBITAL ARC RINGS
+        ============================================================ */
+        const arcGroup = new THREE.Group();
+        scene.add(arcGroup);
 
-        const goldGlowMat = customGlowMaterial.clone(); goldGlowMat.uniforms.color.value = JARVIS_THEME.secondaryArcColor;
-        const secondaryArc = new THREE.Mesh(new THREE.TorusGeometry(4.9, 0.04, 6, 80, Math.PI * 0.8), goldGlowMat);
-        secondaryArc.rotation.x = -Math.PI / 4; secondaryArc.rotation.y = -Math.PI * 0.6; arcGroup.add(secondaryArc);
+        /* — Main arc (large, sweeping) */
+        const mainArc = new THREE.Mesh(
+            new THREE.TorusGeometry(5.2, 0.10, 8, 120, Math.PI * 1.2),
+            glowMat
+        );
+        mainArc.rotation.x = Math.PI / 3;
+        mainArc.rotation.y = Math.PI / 4;
+        arcGroup.add(mainArc);
 
-        const centerCoreNode = new THREE.Mesh(new THREE.SphereGeometry(0.95, 40, 40), new THREE.ShaderMaterial({
-            uniforms: { time: { value: 0.0 }, glowColor: { value: JARVIS_THEME.glowCoreColor } },
-            vertexShader: `varying vec3 vNormal; void main() { vNormal = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-            fragmentShader: `varying vec3 vNormal; uniform vec3 glowColor; void main() { float intensity = dot(vNormal, vec3(0.0, 0.0, 1.0)); vec3 glow = glowColor * (1.0 - intensity); vec3 whiteCore = vec3(1.0, 0.97, 0.92) * pow(intensity, 3.5); gl_FragColor = vec4((glow * 2.0) + (whiteCore * 2.5), 1.0); }`,
-            blending: THREE.AdditiveBlending, transparent: true
-        }));
-        scene.add(centerCoreNode);
+        /* — Secondary arc (tighter, opposite tilt) */
+        const secGlowMat = glowMat.clone();
+        secGlowMat.uniforms.color.value = THEME.secondaryArc;
 
-        const spikesContainer = new THREE.Group(); scene.add(spikesContainer);
-        for(let i = 0; i < 4; i++) {
-            const spikeGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 3.8, 0), new THREE.Vector3(0, 8.2, 0)]);
-            const lineSpike = new THREE.Line(spikeGeo, new THREE.LineBasicMaterial({ color: JARVIS_THEME.laserSpikeColor }));
-            lineSpike.rotation.z = (i * Math.PI) / 2; spikesContainer.add(lineSpike);
+        const secondaryArc = new THREE.Mesh(
+            new THREE.TorusGeometry(4.9, 0.04, 6, 90, Math.PI * 0.8),
+            secGlowMat
+        );
+        secondaryArc.rotation.x = -Math.PI / 4;
+        secondaryArc.rotation.y = -Math.PI * 0.6;
+        arcGroup.add(secondaryArc);
+
+        /* — Tertiary thin ring (new) */
+        const terGlowMat = glowMat.clone();
+        terGlowMat.uniforms.color.value = new THREE.Color(1.0, 0.75, 0.1);
+
+        const tertiaryArc = new THREE.Mesh(
+            new THREE.TorusGeometry(4.5, 0.025, 6, 80, Math.PI * 0.5),
+            terGlowMat
+        );
+        tertiaryArc.rotation.x =  Math.PI * 0.6;
+        tertiaryArc.rotation.z = -Math.PI * 0.3;
+        arcGroup.add(tertiaryArc);
+
+        /* ============================================================
+           CENTRAL GLOW NODE
+           Custom shader: inner white-hot core + outer colour bloom.
+        ============================================================ */
+        const centerCore = new THREE.Mesh(
+            new THREE.SphereGeometry(0.95, 40, 40),
+            new THREE.ShaderMaterial({
+                uniforms: {
+                    time:      { value: 0.0 },
+                    glowColor: { value: THEME.glowCore },
+                },
+                vertexShader: `
+                    varying vec3 vNormal;
+                    void main() {
+                        vNormal     = normalize(normalMatrix * normal);
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3  vNormal;
+                    uniform vec3  glowColor;
+                    uniform float time;
+                    void main() {
+                        float facing    = dot(vNormal, vec3(0.0, 0.0, 1.0));
+                        vec3  outer     = glowColor * (1.0 - facing);
+                        vec3  whiteHot  = vec3(1.0, 0.97, 0.92) * pow(facing, 3.5);
+                        /* heartbeat pulse */
+                        float heartbeat = 1.0 + sin(time * 3.5) * 0.12 + sin(time * 7.0) * 0.04;
+                        gl_FragColor    = vec4((outer * 2.0 + whiteHot * 2.5) * heartbeat, 1.0);
+                    }
+                `,
+                blending:    THREE.AdditiveBlending,
+                transparent: true,
+            })
+        );
+        scene.add(centerCore);
+
+        /* ============================================================
+           LASER SPIKES
+           Four lines radiating outward — rotate continuously.
+        ============================================================ */
+        const spikesGroup = new THREE.Group();
+        scene.add(spikesGroup);
+
+        const spikeMat = new THREE.LineBasicMaterial({ color: THEME.laserSpike });
+
+        for (let i = 0; i < 4; i++) {
+            const geo  = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(0, 3.8, 0),
+                new THREE.Vector3(0, 8.5, 0),
+            ]);
+            const line = new THREE.Line(geo, spikeMat);
+            line.rotation.z = (i * Math.PI) / 2;
+            spikesGroup.add(line);
         }
 
+        /* — Two diagonal spikes (new — makes it look more like a compass rose) */
+        for (let i = 0; i < 4; i++) {
+            const geo  = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(0, 4.5, 0),
+                new THREE.Vector3(0, 6.8, 0),
+            ]);
+            const line = new THREE.Line(geo, new THREE.LineBasicMaterial({
+                color:       THEME.laserSpike,
+                transparent: true,
+                opacity:     0.4,
+            }));
+            line.rotation.z = (i * Math.PI) / 2 + Math.PI / 4;
+            spikesGroup.add(line);
+        }
+
+        /* ============================================================
+           EQUATORIAL RING (new)
+           A solid torus around the equator — subtle & thin.
+        ============================================================ */
+        const eqRingMat = glowMat.clone();
+        eqRingMat.uniforms.color.value = new THREE.Color(0.85, 0.65, 0.05);
+
+        const equatorialRing = new THREE.Mesh(
+            new THREE.TorusGeometry(4.1, 0.018, 6, 160),
+            eqRingMat
+        );
+        /* flat on the XZ plane */
+        equatorialRing.rotation.x = Math.PI / 2;
+        scene.add(equatorialRing);
+
+        /* ============================================================
+           ROTATION ACCUMULATORS
+           We accumulate angles manually so speed changes are smooth.
+        ============================================================ */
+        let rotCoreY   = 0, rotCoreX   = 0;
+        let rotInnerY  = 0, rotInnerX  = 0;
+        let rotPCloud  = 0;
+        let rotMainArc = 0, rotSecArc  = 0, rotTerArc = 0;
+        let rotSpikes  = 0;
+        let rotEqRing  = 0;
+
+        /* smooth scale lerp targets */
+        let scaleCore  = 1.0;
+        let scaleOuter = 1.0;
+
+        /* ============================================================
+           ANIMATION LOOP
+        ============================================================ */
         const clock = new THREE.Clock();
-        let rotCoreY = 0, rotCoreX = 0, rotParticles = 0, rotMainArc = 0, rotSecArc = 0, rotSpikes = 0;
-        let currentScale = 1.0, currentOuterScale = 1.0;
 
-        function renderEngine() {
-            requestAnimationFrame(renderEngine);
-            const delta = clock.getDelta(); const elapsedTime = clock.getElapsedTime(); 
-            customGlowMaterial.uniforms.time.value = elapsedTime;
-            const speedMultiplier = isSpeaking ? 2.2 : 1.0;
+        function animate() {
+            requestAnimationFrame(animate);
 
-            rotCoreY += delta * 0.10 * speedMultiplier; rotCoreX += delta * 0.05 * speedMultiplier; rotParticles -= delta * 0.03 * speedMultiplier;
-            rotMainArc += delta * 0.40 * speedMultiplier; rotSecArc -= delta * 0.55 * speedMultiplier; rotSpikes += delta * 0.07 * speedMultiplier;
+            const dt      = clock.getDelta();
+            const elapsed = clock.getElapsedTime();
 
-            coreSphere.rotation.y = rotCoreY; coreSphere.rotation.x = rotCoreX; particleCloud.rotation.y = rotParticles;
-            mainArc.rotation.z = rotMainArc; secondaryArc.rotation.z = rotSecArc; spikesContainer.rotation.z = rotSpikes;
+            /* ── Time uniforms ── */
+            glowMat.uniforms.time.value         = elapsed;
+            secGlowMat.uniforms.time.value      = elapsed;
+            terGlowMat.uniforms.time.value      = elapsed;
+            eqRingMat.uniforms.time.value       = elapsed;
+            centerCore.material.uniforms.time.value = elapsed;
 
-            let targetBaseScale = isSpeaking ? 1.25 : 1.0;
-            currentScale += (targetBaseScale - currentScale) * 0.1;
-            const dynamicScale = currentScale + Math.sin(elapsedTime * (isSpeaking ? 14.0 : 6.0)) * (isSpeaking ? 0.20 : 0.04);
-            centerCoreNode.scale.set(dynamicScale, dynamicScale, dynamicScale);
-            
-            let targetOuterScale = isSpeaking ? 1.08 : 1.0; 
-            currentOuterScale += (targetOuterScale - currentOuterScale) * 0.1;
-            coreSphere.scale.set(currentOuterScale, currentOuterScale, currentOuterScale); 
-            arcGroup.scale.set(currentOuterScale, currentOuterScale, currentOuterScale);
+            /* ── Speed multiplier ── */
+            const spd = isSpeaking ? 2.4 : 1.0;
 
-            const coords = particleCloud.geometry.attributes.position.array;
-            for (let i = 0; i < particleCount; i++) {
-                let idx = i * 3;
-                let wave = 1.0 + Math.sin(elapsedTime * (isSpeaking ? 5.5 : 2.2) + randomDynamics[i] * 1.8) * (isSpeaking ? 0.06 : 0.022);
-                coords[idx] = originalPositions[idx] * wave; coords[idx+1] = originalPositions[idx+1] * wave; coords[idx+2] = originalPositions[idx+2] * wave;
+            /* ── Accumulate rotations ── */
+            rotCoreY   += dt * 0.10  * spd;
+            rotCoreX   += dt * 0.05  * spd;
+            rotInnerY  -= dt * 0.14  * spd;   // counter-rotate inner sphere
+            rotInnerX  += dt * 0.08  * spd;
+            rotPCloud  -= dt * 0.03  * spd;
+            rotMainArc += dt * 0.42  * spd;
+            rotSecArc  -= dt * 0.58  * spd;
+            rotTerArc  += dt * 0.35  * spd;
+            rotSpikes  += dt * 0.08  * spd;
+            rotEqRing  += dt * 0.06  * spd;
+
+            /* ── Apply rotations ── */
+            coreSphere.rotation.y  = rotCoreY;
+            coreSphere.rotation.x  = rotCoreX;
+            innerSphere.rotation.y = rotInnerY;
+            innerSphere.rotation.x = rotInnerX;
+            particleCloud.rotation.y = rotPCloud;
+            mainArc.rotation.z       = rotMainArc;
+            secondaryArc.rotation.z  = rotSecArc;
+            tertiaryArc.rotation.z   = rotTerArc;
+            spikesGroup.rotation.z   = rotSpikes;
+            equatorialRing.rotation.z = rotEqRing;
+
+            /* ── Central core: heartbeat scale ── */
+            const targetCore  = isSpeaking ? 1.28 : 1.0;
+            scaleCore        += (targetCore - scaleCore) * 0.10;
+            const pulse       = scaleCore +
+                Math.sin(elapsed * (isSpeaking ? 14.0 : 5.5)) * (isSpeaking ? 0.22 : 0.04);
+            centerCore.scale.setScalar(pulse);
+
+            /* ── Outer sphere / arc scale breathe ── */
+            const targetOuter = isSpeaking ? 1.09 : 1.0;
+            scaleOuter       += (targetOuter - scaleOuter) * 0.10;
+            coreSphere.scale.setScalar(scaleOuter);
+            arcGroup.scale.setScalar(scaleOuter);
+
+            /* ── Particle breathing ── */
+            const pos = particleCloud.geometry.attributes.position.array;
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                const idx  = i * 3;
+                const wave = 1.0 + Math.sin(
+                    elapsed * (isSpeaking ? 5.8 : 2.2) + pPhase[i]
+                ) * (isSpeaking ? 0.07 : 0.022);
+                pos[idx]   = pOrigin[idx]   * wave;
+                pos[idx+1] = pOrigin[idx+1] * wave;
+                pos[idx+2] = pOrigin[idx+2] * wave;
             }
             particleCloud.geometry.attributes.position.needsUpdate = true;
+
             renderer.render(scene, camera);
         }
-        renderEngine();
 
+        animate();
+
+        /* ============================================================
+           RESIZE HANDLER
+        ============================================================ */
         window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
     </script>
